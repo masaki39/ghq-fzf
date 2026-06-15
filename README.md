@@ -12,8 +12,10 @@ Install once and use your own command name — no extra configuration needed.
 ## ✨ Features
 
 - 🔍 **Fuzzy search** across all your ghq-managed repositories
+- 🕐 **Sorted by recently used** (most recently committed repo appears first)
 - 🌲 **File tree preview** via `eza`
 - 🌿 **Branch name + last updated** shown in the footer on focus
+- 📝 **Open in editor** with `Ctrl-E` (uses `$EDITOR`)
 - 🌐 **Open in browser** with `Ctrl-O` (uses `gh`)
 - 📥 **Clone a new repository** with `Ctrl-G` (`ghq get`) and `cd` into it
 - 🎨 **Tokyo Night color theme** out of the box
@@ -67,6 +69,7 @@ Type your command name (e.g. `gv`) to open the picker and `cd` into the selected
 | Key | Action |
 |-----|--------|
 | `Enter` | `cd` into the selected repository |
+| `Ctrl-E` | Open the repository in `$EDITOR` |
 | `Ctrl-O` | Open the repository in your browser |
 | `Ctrl-G` | Clone a new repository (`ghq get`) and `cd` into it |
 | `Esc` / `Ctrl-C` | Close without changing directory |
