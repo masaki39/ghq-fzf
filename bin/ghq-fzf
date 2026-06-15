@@ -1,0 +1,150 @@
+#!/usr/bin/env zsh
+set -euo pipefail
+
+BOLD='\033[1m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+_picker() {
+  local root
+  root=$(ghq root)
+
+  local _get_helper
+  _get_helper=$(mktemp)
+  cat > "$_get_helper" << 'HELPER'
+#!/usr/bin/env zsh
+printf 'ghq get (user/repo or URL): ' >&2
+read -r r || exit 1
+[[ -z "$r" ]] && exit 1
+ghq get "$r" >&2 || exit 1
+name="${r##*/}"
+name="${name%.git}"
+name_pat="${name//./\\.}"
+ghq list | grep "/${name_pat}$" | tail -1
+HELPER
+  chmod +x "$_get_helper"
+  trap "rm -f '$_get_helper'" EXIT
+
+  local footer_cmd="
+    branch=\$(git -C '$root'/{} branch --show-current 2>/dev/null)
+    updated=\$(git -C '$root'/{} log -1 --format='last updated %cr' 2>/dev/null)
+    if [ -n \"\$branch\" ] && [ -n \"\$updated\" ]; then
+      echo \" \$branch  \$updated\"
+    elif [ -n \"\$updated\" ]; then
+      echo \" \$updated\"
+    fi
+  "
+
+  ghq list | fzf \
+    --layout=reverse \
+    --style full:double \
+    --border \
+    --highlight-line \
+    --cycle \
+    --tiebreak=index \
+    --info=right \
+    --separator='―' \
+    --list-label ' Result ' \
+    --color 'bg:#1a1b26,bg+:#24283b,fg:#c0caf5,fg+:#c0caf5,hl:#7aa2f7,hl+:#7dcfff,border:#7aa2f7,label:#7aa2f7,list-border:#9ece6a,list-label:#9ece6a,preview-border:#bb9af7,preview-label:#bb9af7,input-border:#7dcfff,input-label:#7dcfff,header-border:#e0af68,header-label:#e0af68,footer:#f7768e,footer-border:#f7768e,footer-label:#f7768e,pointer:#ff9e64,marker:#9ece6a,gutter:#1a1b26,prompt:#7aa2f7,query:#c0caf5,info:#c0caf5,spinner:#ff9e64' \
+    --preview "eza -TL 2 --color=always --icons --git-ignore '$root'/{}" \
+    --preview-label ' Eza Preview ' \
+    --border-label ' GHQ ' \
+    --info-command='echo "$(echo {} | cut -d/ -f3-)  $FZF_MATCH_COUNT/$FZF_TOTAL_COUNT"' \
+    --header $'^O: browser  ^G: clone' --header-label ' Keys ' \
+    --bind "start:transform-footer($footer_cmd)" \
+    --bind "focus:transform-footer($footer_cmd)" \
+    --bind "zero:transform-footer(echo ' no results')" \
+    --bind "ctrl-o:execute-silent(cd '$root'/{} && gh repo view --web 2>/dev/null)+abort" \
+    --bind "ctrl-g:become($_get_helper)" \
+    || true
+}
+
+_install() {
+  local zshrc
+  zshrc="$(readlink -f "${ZDOTDIR:-$HOME}/.zshrc" 2>/dev/null || realpath "${ZDOTDIR:-$HOME}/.zshrc")"
+  local prefix
+  prefix="$(brew --prefix)"
+
+  if grep -qF "# ghq-fzf" "$zshrc" 2>/dev/null; then
+    echo -e "${YELLOW}Already installed${NC} in $zshrc."
+    printf "Overwrite? [y/N]: "
+    read -r ans
+    [[ "$ans" != [yY] ]] && exit 0
+    sed -i.bak '/^# ghq-fzf$/d; /^export GHQ_FZF_FUNC=/d; /^export GHQ_FZF_KEY=/d; /^source.*share\/ghq-fzf\/init\.zsh/d' "$zshrc"
+    rm -f "$zshrc.bak"
+  fi
+
+  echo -e "${BOLD}ghq-fzf shell integration setup${NC}"
+  echo ""
+
+  printf "Command name ${CYAN}(e.g. gv)${NC}: "
+  local func_name=""
+  read -r func_name
+  if [[ -z "$func_name" ]]; then
+    echo -e "${RED}Error: command name is required.${NC}" >&2
+    exit 1
+  fi
+  if [[ ! "$func_name" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]]; then
+    echo -e "${RED}Invalid: use letters, digits, underscores, or hyphens (must start with a letter or _).${NC}" >&2
+    exit 1
+  fi
+
+  {
+    echo "# ghq-fzf"
+    echo "export GHQ_FZF_FUNC='$func_name'"
+    echo "source $prefix/share/ghq-fzf/init.zsh"
+  } >> "$zshrc"
+
+  echo ""
+  echo -e "${GREEN}✓ Installed${NC} in $zshrc"
+  echo -e "Restart your shell or run: ${CYAN}source $zshrc${NC}"
+}
+
+_uninstall() {
+  local zshrc
+  zshrc="$(readlink -f "${ZDOTDIR:-$HOME}/.zshrc" 2>/dev/null || realpath "${ZDOTDIR:-$HOME}/.zshrc")"
+
+  if ! grep -qF "# ghq-fzf" "$zshrc" 2>/dev/null; then
+    echo -e "${YELLOW}Not installed${NC} in $zshrc"
+    exit 0
+  fi
+
+  sed -i.bak '/^$/{N; /\n# ghq-fzf$/d;}; /^# ghq-fzf$/d; /^export GHQ_FZF_FUNC=/d; /^export GHQ_FZF_KEY=/d; /^source.*share\/ghq-fzf\/init\.zsh/d' "$zshrc"
+  rm -f "$zshrc.bak"
+  echo -e "${GREEN}✓ Removed${NC} from $zshrc"
+  echo "Restart your shell to apply changes."
+}
+
+case "${1:-}" in
+  install)
+    _install
+    ;;
+  uninstall)
+    _uninstall
+    ;;
+  --help|-h|help)
+    echo -e "${BOLD}Usage:${NC} ghq-fzf [command]"
+    echo ""
+    echo -e "${BOLD}Commands:${NC}"
+    echo "  (none)     Open the interactive repository picker"
+    echo "  install    Add shell integration to ~/.zshrc"
+    echo "  uninstall  Remove shell integration from ~/.zshrc"
+    echo ""
+    echo -e "${BOLD}In-picker keys:${NC}"
+    echo "  enter   cd into the selected repository"
+    echo "  ctrl-o  open repository in browser"
+    echo "  ctrl-g  clone a new repository (ghq get) and cd into it"
+    echo "  esc     close without changing directory"
+    ;;
+  "")
+    _picker
+    ;;
+  *)
+    echo -e "${RED}Error: unknown command '$1'${NC}" >&2
+    echo "Run 'ghq-fzf --help' for usage." >&2
+    exit 1
+    ;;
+esac
