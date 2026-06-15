@@ -38,7 +38,14 @@ HELPER
     fi
   "
 
-  ghq list | fzf \
+  local editor="${EDITOR:-vim}"
+
+  ghq list | while IFS= read -r r; do
+    ts=$(stat -f %m "$root/$r/.git/COMMIT_EDITMSG" 2>/dev/null \
+      || stat -f %m "$root/$r/.git/HEAD" 2>/dev/null \
+      || echo 0)
+    printf '%s\t%s\n' "$ts" "$r"
+  done | sort -rn | cut -f2- | fzf \
     --layout=reverse \
     --style full:double \
     --highlight-line \
@@ -51,10 +58,11 @@ HELPER
     --preview-label ' Eza Preview ' \
     --border-label ' GHQ ' \
     --info-command='echo "$(echo {} | cut -d/ -f3-)  $FZF_MATCH_COUNT/$FZF_TOTAL_COUNT"' \
-    --header $'^O: browser  ^G: clone' --header-label ' Keys ' \
+    --header $'^O: browser  ^G: clone  ^E: editor' --header-label ' Keys ' \
     --bind "focus:transform-footer($footer_cmd)" \
     --bind "zero:transform-footer(echo ' no results')" \
     --bind "ctrl-o:execute-silent(cd '$root'/{} && gh repo view --web 2>/dev/null)+abort" \
+    --bind "ctrl-e:execute($editor '$root'/{})+abort" \
     --bind "ctrl-g:become($_get_helper)" \
     || true
 }
@@ -134,6 +142,7 @@ case "${1:-}" in
     echo ""
     echo -e "${BOLD}In-picker keys:${NC}"
     echo "  enter   cd into the selected repository"
+    echo "  ctrl-e  open repository in \$EDITOR"
     echo "  ctrl-o  open repository in browser"
     echo "  ctrl-g  clone a new repository (ghq get) and cd into it"
     echo "  esc     close without changing directory"

@@ -7,7 +7,8 @@ CLEAN_ENV = env -i \
 	TERM="$$TERM" \
 	TMPDIR="$$TMPDIR" \
 	LANG="$$LANG" \
-	COLORTERM="$$COLORTERM"
+	COLORTERM="$$COLORTERM" \
+	EDITOR="$$EDITOR"
 
 # Run picker from source in a clean environment
 run:
