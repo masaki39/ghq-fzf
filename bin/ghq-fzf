@@ -63,7 +63,7 @@ HELPER
     --bind "focus:transform-footer($footer_cmd)" \
     --bind "zero:transform-footer(echo ' no results')" \
     --bind "ctrl-o:execute-silent(cd '$root'/{} && gh repo view --web 2>/dev/null)+abort" \
-    --bind "ctrl-e:execute($editor '$root'/{})+abort" \
+    --bind "ctrl-e:execute($editor '$root'/{})+accept" \
     --bind "ctrl-g:become($_get_helper)" \
     || true
 }
