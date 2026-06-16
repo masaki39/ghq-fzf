@@ -12,33 +12,15 @@ _picker() {
   local root
   root=$(ghq root)
 
-  local _get_helper
-  _get_helper=$(mktemp)
-  cat > "$_get_helper" << 'HELPER'
-#!/usr/bin/env zsh
-trap 'rm -f "$0"' EXIT
-printf 'ghq get (user/repo or URL): ' >&2
-read -r r || exit 1
-[[ -z "$r" ]] && exit 1
-ghq get "$r" >&2 || exit 1
-name="${r##*/}"
-name="${name%.git}"
-ghq list | awk -F/ -v n="$name" '$NF == n' | tail -1
-HELPER
-  chmod +x "$_get_helper"
-  trap "rm -f '$_get_helper'" EXIT
-
   local footer_cmd="
     branch=\$(git -C '$root'/{} branch --show-current 2>/dev/null)
     updated=\$(git -C '$root'/{} log -1 --format='last updated %cr' 2>/dev/null)
     if [ -n \"\$branch\" ] && [ -n \"\$updated\" ]; then
-      echo \" \$branch  \$updated\"
+      echo \"⑂ \$branch \$updated\"
     elif [ -n \"\$updated\" ]; then
       echo \" \$updated\"
     fi
   "
-
-  local editor="${EDITOR:-vim}"
 
   ghq list | while IFS= read -r r; do
     ts=$(stat -f %m "$root/$r/.git/COMMIT_EDITMSG" 2>/dev/null \
@@ -50,21 +32,27 @@ HELPER
     --style full:double \
     --highlight-line \
     --cycle \
+    --gap 1 \
+    --padding '0,1' \
     --tiebreak=index \
     --info=right \
+    --prompt='🔍️' \
+    --ghost='search...' \
     --separator='―' \
+    --scrollbar='▌' \
+    --pointer='▶' \
     --list-label ' Result ' \
     --color 'bg:#1a1b26,bg+:#24283b,fg:#c0caf5,fg+:#c0caf5,hl:#7aa2f7,hl+:#7dcfff,border:#7aa2f7,label:#7aa2f7,list-border:#9ece6a,list-label:#9ece6a,preview-border:#bb9af7,preview-label:#bb9af7,input-border:#7dcfff,input-label:#7dcfff,header-border:#e0af68,header-label:#e0af68,footer:#f7768e,footer-border:#f7768e,footer-label:#f7768e,pointer:#ff9e64,marker:#9ece6a,gutter:#1a1b26,prompt:#7aa2f7,query:#c0caf5,info:#c0caf5,spinner:#ff9e64' \
     --preview "eza -TL 2 --color=always --icons --git-ignore '$root'/{}" \
     --preview-label ' Eza Preview ' \
-    --border-label ' GHQ ' \
+    --preview-window 'right:40%' \
+    --border-label ' GHQ-FZF ' \
     --info-command='echo "$(echo {} | cut -d/ -f3-)  $FZF_MATCH_COUNT/$FZF_TOTAL_COUNT"' \
-    --header $'^O: browser  ^G: clone  ^E: editor' --header-label ' Keys ' \
+    --header $' Enter: cd  ^O: browser' --header-label ' Keys ' \
+    --header-lines-border=inline \
     --bind "focus:transform-footer($footer_cmd)" \
     --bind "zero:transform-footer(echo ' no results')" \
     --bind "ctrl-o:execute-silent(cd '$root'/{} && gh repo view --web 2>/dev/null)+abort" \
-    --bind "ctrl-e:execute($editor '$root'/{})+accept" \
-    --bind "ctrl-g:become($_get_helper)" \
     || true
 }
 
@@ -143,9 +131,7 @@ case "${1:-}" in
     echo ""
     echo -e "${BOLD}In-picker keys:${NC}"
     echo "  enter   cd into the selected repository"
-    echo "  ctrl-e  open repository in \$EDITOR"
     echo "  ctrl-o  open repository in browser"
-    echo "  ctrl-g  clone a new repository (ghq get) and cd into it"
     echo "  esc     close without changing directory"
     ;;
   "")
